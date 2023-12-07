@@ -1,6 +1,7 @@
 /* Standard / system libraries */
 #include <errno.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <linux/usb/functionfs.h>
 #include <pthread.h>
 #include <signal.h>
@@ -20,39 +21,13 @@
 #include "thread_read.h"
 #include "thread_write.h"
 #include "usb_descriptors.h"
+#include "sdr_usb_gadget_types.h"
 
 /* Macros */
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #define DEBUG_PRINT(...) if (debug) printf("Main: "__VA_ARGS__)
 
-/* Constants */
-#define SDR_USB_GADGET_COMMAND_START (0x10)
-#define SDR_USB_GADGET_COMMAND_STOP (0x11)
-#define SDR_USB_GADGET_COMMAND_TARGET_RX (0x00)
-#define SDR_USB_GADGET_COMMAND_TARGET_TX (0x01)
-
 /* Type definitions */
-#pragma pack(push,1)
-typedef struct
-{
-	/* Bitmask of enabled channels */
-	uint32_t enabled_channels;
-
-	/*
-	** Buffer size (in samples)
-	** Note: This should include space for the 64-bit timestamp.
-	** For example with RX0's I and Q channels enabled, each sample will be 2 * 16bit = 32bit
-	** therefore a timestamp will occupy 64bit / 32bit = 2 samples. If a timestamp were to be provided
-	** at the start of each buffer's worth of samples, an additional two samples would need to be added to
-	** the buffer space.
-	** Likewise if RX0 and RX1's I and Q channels were enabled, each sample will be 4 * 16bit = 64bit
-	** as such only one sample would be required for the timestamp.
-	*/
-	uint32_t buffer_size;
-
-} cmdStartRequest_t;
-#pragma pack(pop)
-
 typedef struct
 {
 	/* Endpoint file descriptors */
@@ -113,10 +88,18 @@ int main(int argc, char *argv[])
 	printf("Welcome!\n");
 	printf("--------\n");
 
+	/* Long options array, mapping options to their short equivalents */
+	struct option long_options[] = {
+		{"debug", no_argument, NULL, 'd'},
+		{"version", no_argument, NULL, 'v'},
+		{"help", no_argument, NULL, 'h'},
+		{0, 0, 0, 0} // Terminate the options array
+	};
+
 	/* Basic argument parsing */
 	int opt_c;
 	bool err = false;
-	while ((opt_c = getopt(argc, argv, "dvh")) != -1)
+	while ((opt_c = getopt_long(argc, argv, "dhv", long_options, NULL)) != -1)
 	{
 			switch (opt_c)
 			{
@@ -299,7 +282,7 @@ static int handle_ep0(state_t *state)
 			else
 			{
 				uint8_t control_in_data[64];
-				const cmdStartRequest_t *cmd_start_req = (const cmdStartRequest_t*)control_in_data;
+				const cmd_usb_start_request_t *cmd_start_req = (const cmd_usb_start_request_t*)control_in_data;
 
 				/* Read request */
 				ssize_t read_count = read(state->ep[0], control_in_data, sizeof(control_in_data));
@@ -577,6 +560,7 @@ static void print_usage(const char *program_name, FILE *dest)
 	fprintf(dest, "Usage: %s [OPTIONS] FFS_DIRECTORY\n", program_name);
 	fprintf(dest, "OPTIONS:\n");
 	fprintf(dest, "  -h, --help\tDisplay this help message\n");
+	fprintf(dest, "  -d, --debug\tEnable debug output\n");
 	fprintf(dest, "  -v, --version\tDisplay the version of the program\n");
 }
 

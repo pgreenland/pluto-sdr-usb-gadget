@@ -144,7 +144,6 @@ void *THREAD_READ_Entrypoint(void *args)
 	epoll_event.data.ptr = handle_eventfd_thread;
 	if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, thread_args->quit_event_fd, &epoll_event) < 0)
 	{
-		/* Failed to register aio completion eventfd with epoll */
 		perror("Failed to register thread quit eventfd with epoll");
 		return NULL;
 	}
